@@ -15,6 +15,7 @@
     "typecheck:extension": "bunx tsc -p extension/tsconfig.json --noEmit",
     "typecheck": "bun run typecheck:worker && bun run typecheck:extension",
     "build:extension": "(cd extension && bun run build)",
+    "release": "bun run scripts/release-extension.ts",
     "prepare": "husky"
   },
   "devDependencies": {
