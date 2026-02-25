@@ -1,0 +1,14 @@
+# Node
+node_modules/
+dist/
+
+# Cloudflare
+.wrangler/
+
+# OS / editor
+.DS_Store
+.idea/
+
+**.dev.vars
+
+.agents
