@@ -1,4 +1,4 @@
-<img src="logo.png" alt="Coursera Deadline Tracker" align="right" width="120">
+<img src="logo.png" alt="Coursera Deadline Tracker" width="120">
 
 # Coursera Deadline Tracker
 
