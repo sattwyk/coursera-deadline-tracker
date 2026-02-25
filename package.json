@@ -15,6 +15,8 @@
     "typecheck:extension": "bunx tsc -p extension/tsconfig.json --noEmit",
     "typecheck": "bun run typecheck:worker && bun run typecheck:extension",
     "build:extension": "(cd extension && bun run build)",
+    "simulate:all": "bun run scripts/simulate-all.ts",
+    "telegram:sync-commands": "bun run scripts/telegram-sync-commands.ts",
     "release": "bun run scripts/release-extension.ts",
     "prepare": "husky"
   },
