@@ -1,4 +1,5 @@
 import { handleCronFetch } from "./routes/cron";
+import { handleDeadlines } from "./routes/deadlines";
 import { handleFetchNow } from "./routes/fetch-now";
 import { handleOnboardingCancel } from "./routes/onboarding-cancel";
 import { handleOnboardingStart } from "./routes/onboarding-start";
@@ -39,6 +40,10 @@ export default {
 
     if (req.method === "GET" && url.pathname === "/api/status") {
       return handleStatus(req, env);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/deadlines") {
+      return handleDeadlines(req, env);
     }
 
     if (req.method === "POST" && url.pathname === "/api/telegram/webhook") {

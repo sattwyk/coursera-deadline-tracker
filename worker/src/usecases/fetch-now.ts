@@ -132,6 +132,7 @@ export async function runFetchNow(input: {
 
   return {
     itemsSeen: trackedLatest.length,
+    allNormalized: normalized,
     normalized: trackedLatest,
     events,
   };
@@ -207,11 +208,13 @@ async function runFetchNowForUserResult(input: {
     getStoredDeadlines(input.db, input.userId),
   );
   if (Result.isError(previousStoredResult)) return previousStoredResult;
-  const previousLite = previousStoredResult.value.map((item) => ({
-    stableKey: item.stableKey,
-    deadlineAt: item.deadlineAt,
-    isComplete: item.isComplete,
-  }));
+  const previousLite = previousStoredResult.value
+    .filter((item) => isTracked(item, input.nowIso))
+    .map((item) => ({
+      stableKey: item.stableKey,
+      deadlineAt: item.deadlineAt,
+      isComplete: item.isComplete,
+    }));
 
   const result = await runFetchNow({
     nowIso: input.nowIso,
@@ -219,7 +222,7 @@ async function runFetchNowForUserResult(input: {
     latestResponse: allItems,
   });
 
-  const storedRows = result.normalized.map(toStored);
+  const storedRows = result.allNormalized.map(toStored);
   const replaceStoredResult = await runDb("replaceStoredDeadlines", () =>
     replaceStoredDeadlines(input.db, input.userId, storedRows),
   );
@@ -354,7 +357,8 @@ export async function runFetchNowForUser(input: {
       };
     }
     const runId = startRunResult.value;
-    const fetchImpl: FetchLike = input.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+    const fetchImpl: FetchLike =
+      input.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
 
     const runResult = await runFetchNowForUserResult({
       env: input.env,

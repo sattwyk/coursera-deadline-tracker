@@ -123,6 +123,7 @@ export type FetchRunResult = {
 };
 
 export type NotifyMode = "all" | "new" | "changed" | "none";
+export type DeadlineFilter = "pending" | "completed" | "upcoming" | "overdue" | "all";
 export type OnboardingStatus = "pending" | "linked" | "expired" | "cancelled";
 
 export type OnboardingLink = {
@@ -273,7 +274,10 @@ export async function createOnboardingLink(
   return { linkCode, pollToken, expiresAt };
 }
 
-export async function expireOnboardingLinks(db: D1Database, now: string = nowIso()): Promise<number> {
+export async function expireOnboardingLinks(
+  db: D1Database,
+  now: string = nowIso(),
+): Promise<number> {
   await ensureSchema(db);
   const out = await db
     .prepare(
@@ -368,7 +372,9 @@ export async function replaceUserDegreeTargets(
     );
   }
   statements.push(
-    db.prepare("UPDATE users SET reauth_required = 0, updated_at = ?1 WHERE id = ?2").bind(ts, input.userId),
+    db
+      .prepare("UPDATE users SET reauth_required = 0, updated_at = ?1 WHERE id = ?2")
+      .bind(ts, input.userId),
   );
   await db.batch(statements);
 }
@@ -560,8 +566,10 @@ export async function getLastFetchStatus(
     .first<{ finishedAt: string | null; status: string | null }>();
 
   const countRow = await db
-    .prepare("SELECT COUNT(*) as count FROM deadlines_current WHERE user_id = ?1")
-    .bind(userId)
+    .prepare(
+      "SELECT COUNT(*) as count FROM deadlines_current WHERE user_id = ?1 AND is_complete = 0 AND deadline_at > ?2",
+    )
+    .bind(userId, nowIso())
     .first<{ count: number }>();
 
   return {
@@ -569,6 +577,66 @@ export async function getLastFetchStatus(
     lastRunStatus: lastRun?.status ?? null,
     trackedItems: Number(countRow?.count ?? 0),
   };
+}
+
+export async function listCurrentDeadlines(
+  db: D1Database,
+  input: {
+    userId: string;
+    filter: DeadlineFilter;
+    limit?: number;
+    offset?: number;
+    nowIso?: string;
+  },
+): Promise<
+  Array<{
+    stableKey: string;
+    kind: "assignment" | "event";
+    courseName: string;
+    title: string;
+    deadlineAt: string;
+    isComplete: boolean;
+    url: string;
+  }>
+> {
+  await ensureSchema(db);
+  const now = input.nowIso ?? nowIso();
+  const limit = Math.max(1, Math.min(100, input.limit ?? 20));
+  const offset = Math.max(0, input.offset ?? 0);
+  const whereByFilter: Record<DeadlineFilter, string> = {
+    pending: "is_complete = 0",
+    completed: "is_complete = 1",
+    upcoming: "is_complete = 0 AND deadline_at > ?2",
+    overdue: "is_complete = 0 AND deadline_at <= ?2",
+    all: "1=1",
+  };
+
+  const where = whereByFilter[input.filter];
+  const sql = `SELECT stable_key as stableKey, kind, course_name as courseName, title, deadline_at as deadlineAt, is_complete as isComplete, url
+    FROM deadlines_current
+    WHERE user_id = ?1 AND ${where}
+    ORDER BY deadline_at ASC
+    LIMIT ?3 OFFSET ?4`;
+
+  const rows = await db.prepare(sql).bind(input.userId, now, limit, offset).all<{
+    stableKey: string;
+    kind: "assignment" | "event";
+    courseName: string;
+    title: string;
+    deadlineAt: string;
+    isComplete: number;
+    url: string;
+  }>();
+
+  return (rows.results ?? []).map((row) => ({
+    stableKey: row.stableKey,
+    kind: row.kind,
+    courseName: row.courseName,
+    title: row.title,
+    deadlineAt: row.deadlineAt,
+    isComplete: Boolean(row.isComplete),
+    url: row.url,
+  }));
 }
 
 export async function listUsersForCron(
