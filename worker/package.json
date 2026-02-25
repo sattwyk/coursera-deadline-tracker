@@ -1,0 +1,19 @@
+{
+  "name": "@app/worker",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "bun test",
+    "tunnel": "sh ./scripts/cloudflared-quick.sh",
+    "tunnel:fixed": "sh ./scripts/cloudflared-named.sh"
+  },
+  "dependencies": {
+    "better-result": "^2.7.0",
+    "wrangler": "^4.68.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260201.0",
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
