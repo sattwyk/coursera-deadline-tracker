@@ -1,172 +1,130 @@
+<img src="logo.png" alt="Coursera Deadline Tracker" align="right" width="120">
+
 # Coursera Deadline Tracker
 
-Chrome extension + Cloudflare Worker spike for tracking Coursera deadline changes and sending Telegram alerts.
+Get Telegram alerts when your Coursera assignment deadlines change. Tracks your degree page and notifies you of new, modified, or approaching deadlines.
 
-## One-Click Onboarding (Current UX)
+## Quick Start
 
-1. Open extension popup.
-2. Click `Connect Telegram`.
-3. Telegram opens with a deep-link. Send `/start`.
-4. Return to popup. It auto-polls link status and auto-connects Coursera session.
-5. If Coursera IDs are missing, open your Coursera degree page once and retry/refresh.
-
-Notes:
-
-- Production bundle hides manual setup knobs.
-- Dev bundle keeps manual register/connect controls for debugging.
-
-## Workspaces
-
-- `worker/` Cloudflare Worker and tests
-- `extension/` MV3 extension
-
-## Test
+### 1. Deploy the Worker
 
 ```bash
-bun install
-bun test
+cd worker
+wrangler deploy
 ```
 
-## Local smoke
+### 2. Configure Secrets
 
 ```bash
-bash scripts/e2e-smoke.sh
+wrangler secret put TELEGRAM_BOT_TOKEN
+wrangler secret put TELEGRAM_WEBHOOK_SECRET  # optional
 ```
 
-For actual day-to-day dev run/use flow (server + tunnel + extension + Telegram), follow:
-
-`docs/runbooks/dev-usage.md`
-
-Optional onboarding route smoke:
+### 3. Set Up Telegram Webhook
 
 ```bash
-SMOKE_ONBOARDING=1 bash scripts/e2e-smoke.sh
+# Replace with your values
+TOKEN="<bot-token>" WORKER_URL="https://your-worker.workers.dev" \
+curl -sS "https://api.telegram.org/bot$TOKEN/setWebhook" \
+  -H "content-type: application/json" \
+  -d "{\"url\":\"$WORKER_URL/api/telegram/webhook\"}"
 ```
 
-`SMOKE_ONBOARDING=1` expects worker secrets/bindings to be configured, including Telegram bot token.
-
-## Full Feature Simulation
-
-Run a full onboarding + session + sync + Telegram command simulation against your local worker:
+### 4. Load the Extension
 
 ```bash
-BASE_URL=http://127.0.0.1:8787 \
-SIM_CHAT_ID=<your-telegram-chat-id> \
-SIM_WEBHOOK_SECRET=<your-webhook-secret-if-set> \
-bun run simulate:all
-```
+# Build the extension
+EXTENSION_BASE_URL=https://your-worker.workers.dev bun run release
 
-The simulation now prints deadlines grouped by filters (`upcoming`, `pending`, `completed`, `overdue`, `all`) using `/api/deadlines`.
-
-Optional flags:
-
-- `SIM_RUN_COMMANDS=false` to skip Telegram command replay.
-- `SIM_WEBHOOK_SECRET` (or `TELEGRAM_WEBHOOK_SECRET`) if webhook route enforces secret header.
-- `SIM_INLINE_STRICT=true` to fail on inline-query simulation errors.
-- `SIM_REAL_COURSERA=true` to use real Coursera session values. Required env in this mode:
-  - `CAUTH`
-  - `CSRF3_TOKEN`
-  - `COURSERA_USER_ID`
-  - `DEGREE_IDS` (comma-separated)
-
-Note: inline-query simulation uses a synthetic `inline_query.id` and may be rejected by Telegram API in local runs.
-This does not indicate inline mode is broken. For real validation, test inline mode directly in Telegram by typing
-`@<your_bot_username> upcoming` in any chat.
-
-## Extension build (Bun bundler)
-
-From repo root:
-
-```bash
+# Or for local dev
 bun run build:extension
 ```
 
-Load unpacked extension from:
+Load unpacked from `extension/dist` in Chrome (`chrome://extensions/` → Developer mode → Load unpacked).
 
-`extension/dist`
+### 5. Open the Extension
 
-Extension runtime source files are:
+1. Click "Connect Telegram" → sends `/start` to your bot
+2. Return to popup → auto-connects
+3. Open your Coursera degree page once to auto-detect IDs
 
-- `extension/background.ts`
-- `extension/popup.ts`
+## Features
 
-`extension/popup.html` is a Bun HTML entrypoint and is bundled/re-written into `extension/dist/popup.html`.
+- **Auto-detect deadlines** - Monitors your Coursera degree page for changes
+- **Telegram notifications** - Alerts for new, changed, or approaching deadlines
+- **Inline search** - Type `@yourbot upcoming` in any chat to see deadlines
+- **Timezone support** - Set your timezone with `/tz Asia/Kolkata`
+- **Filter modes** - `/mode all|new|changed|none` controls which updates notify
 
-Extension build modes:
+### Telegram Commands
 
-- Dev (includes manual dev knobs in popup):  
-  `cd extension && bun run build:dev`
-- Prod (strips dev knobs from bundle):  
-  `cd extension && EXTENSION_BASE_URL=https://<your-worker-host> bun run build:prod`
+| Command              | Description                                             |
+| -------------------- | ------------------------------------------------------- |
+| `/start`             | Link Telegram to extension                              |
+| `/status`            | Show last sync + settings                               |
+| `/list <filter>`     | Show deadlines (pending/completed/upcoming/overdue/all) |
+| `/settings`          | Notification preferences                                |
+| `/pause` / `/resume` | Toggle notifications                                    |
+| `/mode <mode>`       | Set notification filter                                 |
+| `/tz <timezone>`     | Set timezone                                            |
+| `/sync`              | Run immediate sync                                      |
+| `/help`              | Show all commands                                       |
 
-For incremental JS rebuilds while editing extension scripts:
+## Architecture
 
-```bash
-cd extension
-bun run build:watch
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
+│ Chrome          │────▶│ Cloudflare       │────▶│ Coursera    │
+│ Extension       │     │ Worker           │     │ API         │
+│ (popup.ts)      │     │ (worker/)        │     │             │
+└─────────────────┘     └────────┬─────────┘     └─────────────┘
+                                 │
+                                 ▼
+                        ┌──────────────────┐
+                        │ Telegram         │
+                        │ Bot + Webhook    │
+                        └──────────────────┘
 ```
 
-## Cloudflared Tunnel
+- **extension/** - Chrome MV3 extension (popup + background)
+- **worker/** - Cloudflare Worker (fetch, diff, notify)
 
-From `worker/`:
-
-```bash
-bun run tunnel
-```
-
-This starts a Cloudflare quick tunnel and prints a `https://<random>.trycloudflare.com` URL.
-
-For a stable URL, use a named tunnel (after one-time Cloudflare tunnel setup):
+## Development
 
 ```bash
-CF_TUNNEL_NAME=coursera-deadline bun run tunnel:fixed
+# Install dependencies
+bun install
+
+# Run tests
+bun test
+
+# Local development
+cd worker && bun run dev
+
+# Test cron trigger locally
+cd worker && bun run cron
+
+# Full feature simulation
+BASE_URL=http://127.0.0.1:8787 \
+SIM_CHAT_ID=<chat-id> \
+bun run simulate:all
 ```
 
-Then set Telegram webhook to:
+See [docs/runbooks/dev-usage.md](docs/runbooks/dev-usage.md) for full dev workflow.
 
-`https://<tunnel-host>/api/telegram/webhook`
-
-## Telegram Bot Commands
-
-After setting webhook, these commands work in Telegram chat with your bot:
-
-- `/status` show last sync + settings
-- `/list <pending|completed|upcoming|overdue|all>` show filtered deadlines with course/item details
-- `/settings` show current notification preferences
-- `/pause` pause notifications
-- `/resume` resume notifications
-- `/mode <all|new|changed|none>` filter which updates notify
-- `/tz <IANA timezone>` set timezone used in messages (example: `Asia/Kolkata`)
-- `/sync` run immediate sync
-- `/test` send test reply
-- `/help` show command list
-
-`/status` and `/list` now include inline keyboard controls for quick filtering, paging and actions.
-
-Inline mode is also supported in the webhook: after enabling inline mode in BotFather, users can type
-`@coursera_deadline_tracker_bot upcoming` in any chat to insert deadline cards.
-
-## Telegram Command Menu Sync
-
-To publish command menus and scopes (private + group, with `en/hi/es` localizations):
+## Release
 
 ```bash
-TELEGRAM_BOT_TOKEN=<your-bot-token> bun run telegram:sync-commands
+# Create GitHub release with extension zip
+EXTENSION_BASE_URL=https://your-worker.workers.dev bun run release
 ```
 
-## Telegram Webhook Setup
+Downloads as a draft release. Users load the zip directly into Chrome.
 
-1. Run worker and expose a reachable URL (Cloudflare deploy or tunnel).
-2. Optionally set webhook secret:
-   - `wrangler secret put TELEGRAM_WEBHOOK_SECRET`
-3. Register webhook:
+## Tech Stack
 
-```bash
-TOKEN="<your-telegram-bot-token>"
-WORKER_URL="<your-worker-url>"
-SECRET="<same-secret-if-configured>"
-
-curl -sS "https://api.telegram.org/bot$TOKEN/setWebhook" \
-  -H "content-type: application/json" \
-  -d "{\"url\":\"$WORKER_URL/api/telegram/webhook\",\"secret_token\":\"$SECRET\"}"
-```
+- **Runtime**: Bun
+- **Worker**: Cloudflare Workers + D1 + KV
+- **Extension**: TypeScript + Bun bundler
+- **Linting**: oxlint + oxfmt
+- **Testing**: Bun test
