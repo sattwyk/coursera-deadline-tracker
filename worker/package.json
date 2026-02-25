@@ -5,7 +5,9 @@
     "dev": "wrangler dev",
     "test": "bun test",
     "tunnel": "sh ./scripts/cloudflared-quick.sh",
-    "tunnel:fixed": "sh ./scripts/cloudflared-named.sh"
+    "tunnel:fixed": "sh ./scripts/cloudflared-named.sh",
+    "cron": "curl -s 'http://localhost:8787/cdn-cgi/handler/scheduled'",
+    "cron:every": "curl -s 'http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/1+*+*+*+*'"
   },
   "dependencies": {
     "better-result": "^2.7.0",
