@@ -4,127 +4,121 @@
 
 Get Telegram alerts when your Coursera assignment deadlines change. Tracks your degree page and notifies you of new, modified, or approaching deadlines.
 
-## Quick Start
+## What This Does
 
-### 1. Deploy the Worker
+- 🔔 **Alerts you on Telegram** when deadlines are added, changed, or due soon
+- 👀 **Watches your Coursera degree page** automatically
+- ⏰ **Respects your timezone** - see deadlines in your local time
+- 🔍 **Search anywhere** - type `@yourbot upcoming` in any chat to see deadlines
+
+## Prerequisites
+
+- A **Telegram account** (to receive alerts)
+- A **Chrome browser** (to run the extension)
+- A **Coursera Plus** or degree program with deadlines
+
+## Set Up
+
+### Step 1: Deploy the Worker
+
+If you have Cloudflare Wrangler installed:
 
 ```bash
 cd worker
 wrangler deploy
 ```
 
-### 2. Configure Secrets
+Or deploy from the [Cloudflare Dashboard](https://dash.cloudflare.com/).
+
+### Step 2: Get a Telegram Bot
+
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot` and follow the instructions
+3. Copy your **bot token** (looks like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
+
+### Step 3: Configure the Worker
 
 ```bash
 wrangler secret put TELEGRAM_BOT_TOKEN
-wrangler secret put TELEGRAM_WEBHOOK_SECRET  # optional
+# Paste your bot token when prompted
 ```
 
-### 3. Set Up Telegram Webhook
+### Step 4: Set the Webhook
 
 ```bash
 # Replace with your values
-TOKEN="<bot-token>" WORKER_URL="https://your-worker.workers.dev" \
+TOKEN="<your-bot-token>"
+WORKER_URL="https://your-worker.workers.dev"
+
 curl -sS "https://api.telegram.org/bot$TOKEN/setWebhook" \
   -H "content-type: application/json" \
   -d "{\"url\":\"$WORKER_URL/api/telegram/webhook\"}"
 ```
 
-### 4. Load the Extension
+### Step 5: Load the Extension
 
-```bash
-# Build the extension
-EXTENSION_BASE_URL=https://your-worker.workers.dev bun run release
+1. Download the release from GitHub Releases
+2. Unzip the file
+3. Open Chrome → `chrome://extensions/`
+4. Enable **Developer mode** (top right)
+5. Click **Load unpacked**
+6. Select the unzipped folder
 
-# Or for local dev
-bun run build:extension
-```
+### Step 6: Connect Everything
 
-Load unpacked from `extension/dist` in Chrome (`chrome://extensions/` → Developer mode → Load unpacked).
+1. Open the extension in Chrome
+2. Click **"Connect Telegram"**
+3. Telegram opens with a deep link - tap **START**
+4. Return to the extension - it auto-connects
+5. Open your Coursera degree page once to auto-detect your IDs
 
-### 5. Open the Extension
+You're all set! You'll get alerts when deadlines change.
 
-1. Click "Connect Telegram" → sends `/start` to your bot
-2. Return to popup → auto-connects
-3. Open your Coursera degree page once to auto-detect IDs
+## Commands
 
-## Features
+In your Telegram chat with the bot:
 
-- **Auto-detect deadlines** - Monitors your Coursera degree page for changes
-- **Telegram notifications** - Alerts for new, changed, or approaching deadlines
-- **Inline search** - Type `@yourbot upcoming` in any chat to see deadlines
-- **Timezone support** - Set your timezone with `/tz Asia/Kolkata`
-- **Filter modes** - `/mode all|new|changed|none` controls which updates notify
+| Command            | What It Does                        |
+| ------------------ | ----------------------------------- |
+| `/start`           | Link your Telegram to the extension |
+| `/status`          | See last sync time and settings     |
+| `/list upcoming`   | Show upcoming deadlines             |
+| `/list pending`    | Show pending assignments            |
+| `/list overdue`    | Show overdue items                  |
+| `/settings`        | Change notification preferences     |
+| `/pause`           | Stop notifications temporarily      |
+| `/resume`          | Re-enable notifications             |
+| `/tz Asia/Kolkata` | Set your timezone                   |
+| `/help`            | Show all commands                   |
 
-### Telegram Commands
+### Inline Search
 
-| Command              | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `/start`             | Link Telegram to extension                              |
-| `/status`            | Show last sync + settings                               |
-| `/list <filter>`     | Show deadlines (pending/completed/upcoming/overdue/all) |
-| `/settings`          | Notification preferences                                |
-| `/pause` / `/resume` | Toggle notifications                                    |
-| `/mode <mode>`       | Set notification filter                                 |
-| `/tz <timezone>`     | Set timezone                                            |
-| `/sync`              | Run immediate sync                                      |
-| `/help`              | Show all commands                                       |
-
-## Architecture
+After enabling inline mode with BotFather, you can search deadlines from any chat:
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
-│ Chrome          │────▶│ Cloudflare       │────▶│ Coursera    │
-│ Extension       │     │ Worker           │     │ API         │
-│ (popup.ts)      │     │ (worker/)        │     │             │
-└─────────────────┘     └────────┬─────────┘     └─────────────┘
-                                 │
-                                 ▼
-                        ┌──────────────────┐
-                        │ Telegram         │
-                        │ Bot + Webhook    │
-                        └──────────────────┘
+@coursera_deadline_tracker_bot upcoming
 ```
 
-- **extension/** - Chrome MV3 extension (popup + background)
-- **worker/** - Cloudflare Worker (fetch, diff, notify)
+## Troubleshooting
 
-## Development
+**No deadlines showing?**
 
-```bash
-# Install dependencies
-bun install
+- Open your Coursera degree page and refresh
+- Run `/sync` to trigger a manual fetch
 
-# Run tests
-bun test
+**Not receiving messages?**
 
-# Local development
-cd worker && bun run dev
+- Check `/status` to see last sync time
+- Make sure you're not in `/pause` mode
 
-# Test cron trigger locally
-cd worker && bun run cron
+**Need to change the worker URL?**
 
-# Full feature simulation
-BASE_URL=http://127.0.0.1:8787 \
-SIM_CHAT_ID=<chat-id> \
-bun run simulate:all
-```
+- Re-run the release script with your new URL:
+  ```
+  EXTENSION_BASE_URL=https://new-url.workers.dev bun run release
+  ```
 
-See [docs/runbooks/dev-usage.md](docs/runbooks/dev-usage.md) for full dev workflow.
+## Support
 
-## Release
-
-```bash
-# Create GitHub release with extension zip
-EXTENSION_BASE_URL=https://your-worker.workers.dev bun run release
-```
-
-Downloads as a draft release. Users load the zip directly into Chrome.
-
-## Tech Stack
-
-- **Runtime**: Bun
-- **Worker**: Cloudflare Workers + D1 + KV
-- **Extension**: TypeScript + Bun bundler
-- **Linting**: oxlint + oxfmt
-- **Testing**: Bun test
+- Open an issue on [GitHub](https://github.com/sattwyk/coursera-deadline-tracker)
+- For bugs or feature requests, include your worker URL and what you tried
