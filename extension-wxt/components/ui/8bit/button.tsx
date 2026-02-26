@@ -6,7 +6,7 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 
 import "@/components/ui/8bit/styles/retro.css";
 
-export const buttonVariants = cva("", {
+const buttonVariants = cva("", {
   variants: {
     font: {
       normal: "",
@@ -33,7 +33,7 @@ export const buttonVariants = cva("", {
   },
 });
 
-export interface BitButtonProps
+interface BitButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   ref?: React.Ref<HTMLButtonElement>;

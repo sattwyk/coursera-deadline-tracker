@@ -11,7 +11,7 @@ import { Label as ShadcnLabel } from "@/components/ui/label";
 
 import "@/components/ui/8bit/styles/retro.css";
 
-export const inputVariants = cva("", {
+const labelVariants = cva("", {
   variants: {
     font: {
       normal: "",
@@ -24,7 +24,7 @@ export const inputVariants = cva("", {
 });
 
 interface BitLabelProps
-  extends React.ComponentProps<typeof LabelPrimitive.Root>, VariantProps<typeof inputVariants> {
+  extends React.ComponentProps<typeof LabelPrimitive.Root>, VariantProps<typeof labelVariants> {
   asChild?: boolean;
 }
 

@@ -4,17 +4,15 @@ import { cn } from "@/lib/utils";
 
 import {
   Card as ShadcnCard,
-  CardAction as ShadcnCardAction,
   CardContent as ShadcnCardContent,
   CardDescription as ShadcnCardDescription,
-  CardFooter as ShadcnCardFooter,
   CardHeader as ShadcnCardHeader,
   CardTitle as ShadcnCardTitle,
 } from "@/components/ui/card";
 
 import "@/components/ui/8bit/styles/retro.css";
 
-export const cardVariants = cva("", {
+const cardVariants = cva("", {
   variants: {
     font: {
       normal: "",
@@ -26,8 +24,7 @@ export const cardVariants = cva("", {
   },
 });
 
-export interface BitCardProps
-  extends React.ComponentProps<"div">, VariantProps<typeof cardVariants> {
+interface BitCardProps extends React.ComponentProps<"div">, VariantProps<typeof cardVariants> {
   asChild?: boolean;
 }
 
@@ -69,28 +66,10 @@ function CardDescription({ ...props }: BitCardProps) {
   );
 }
 
-function CardAction({ ...props }: BitCardProps) {
-  const { className, font } = props;
-
-  return <ShadcnCardAction className={cn(font !== "normal" && "retro", className)} {...props} />;
-}
-
 function CardContent({ ...props }: BitCardProps) {
   const { className, font } = props;
 
   return <ShadcnCardContent className={cn(font !== "normal" && "retro", className)} {...props} />;
 }
 
-function CardFooter({ ...props }: BitCardProps) {
-  const { className, font } = props;
-
-  return (
-    <ShadcnCardFooter
-      data-slot="card-footer"
-      className={cn(font !== "normal" && "retro", className)}
-      {...props}
-    />
-  );
-}
-
-export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent };
+export { Card, CardHeader, CardTitle, CardDescription, CardContent };

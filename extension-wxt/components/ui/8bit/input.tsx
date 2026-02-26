@@ -6,7 +6,7 @@ import { Input as ShadcnInput } from "@/components/ui/input";
 
 import "@/components/ui/8bit/styles/retro.css";
 
-export const inputVariants = cva("", {
+const inputVariants = cva("", {
   variants: {
     font: {
       normal: "",
@@ -18,7 +18,7 @@ export const inputVariants = cva("", {
   },
 });
 
-export interface BitInputProps
+interface BitInputProps
   extends React.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof inputVariants> {
   asChild?: boolean;
 }

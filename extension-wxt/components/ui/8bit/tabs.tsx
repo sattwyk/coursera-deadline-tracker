@@ -12,7 +12,7 @@ import {
 
 import "@/components/ui/8bit/styles/retro.css";
 
-export const tabsVariants = cva("", {
+const tabsVariants = cva("", {
   variants: {
     variant: {
       default: "bg-primary",
@@ -28,7 +28,7 @@ export const tabsVariants = cva("", {
   },
 });
 
-export interface BitTabsProps
+interface BitTabsProps
   extends React.ComponentProps<typeof TabsPrimitive.Root>, VariantProps<typeof tabsVariants> {
   asChild?: boolean;
 }
