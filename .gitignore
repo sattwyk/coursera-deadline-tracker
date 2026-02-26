@@ -2,13 +2,35 @@
 node_modules/
 dist/
 
+# WXT / Extension
+.output/
+.wxt/
+stats.html
+stats-*.json
+web-ext.config.ts
+
+# Logs
+logs
+*.log
+
+# Editors
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
 # Cloudflare
 .wrangler/
 
-# OS / editor
+# OS
 .DS_Store
 .idea/
 
+# Env
 **.dev.vars
 
+# Agents
 .agents
+.wxt-docs/
+.8bitcn-docs/
