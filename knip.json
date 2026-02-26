@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  "workspaces": {
+    "extension-wxt": {
+      "entry": [
+        "wxt.config.ts",
+        "entrypoints/background.ts",
+        "entrypoints/popup/index.html",
+        "entrypoints/popup/main.tsx",
+        "popup-core.test.ts"
+      ],
+      "project": ["**/*.{ts,tsx,js,jsx,css,html}", "!.output/**", "!.wxt/**"],
+      "ignoreBinaries": ["gh"],
+      "ignoreDependencies": [
+        "@wxt-dev/module-react",
+        "@types/chrome",
+        "@types/react",
+        "@types/react-dom",
+        "typescript"
+      ]
+    }
+  }
+}
