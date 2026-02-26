@@ -1,20 +1,26 @@
 {
   "name": "coursera-deadline-tracker",
   "private": true,
-  "workspaces": [
-    "worker",
-    "extension"
-  ],
+  "workspaces": {
+    "packages": [
+      "worker",
+      "extension-wxt"
+    ],
+    "catalog": {
+      "typescript": "beta"
+    }
+  },
   "scripts": {
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "test": "(cd worker && bun test) && (cd extension && bun test)",
+    "test": "(cd worker && bun test) && (cd extension-wxt && bun test)",
+    "test:extension-wxt": "(cd extension-wxt && bun test)",
     "typecheck:worker": "bunx tsc -p worker/tsconfig.json --noEmit",
-    "typecheck:extension": "bunx tsc -p extension/tsconfig.json --noEmit",
-    "typecheck": "bun run typecheck:worker && bun run typecheck:extension",
-    "build:extension": "(cd extension && bun run build)",
+    "typecheck:extension-wxt": "bunx tsc -p extension-wxt/tsconfig.json --noEmit",
+    "typecheck": "bun run typecheck:worker && bun run typecheck:extension-wxt",
+    "build:extension-wxt": "(cd extension-wxt && bun run build)",
     "simulate:all": "bun run scripts/simulate-all.ts",
     "telegram:sync-commands": "bun run scripts/telegram-sync-commands.ts",
     "release": "bun run scripts/release-extension.ts",
@@ -29,11 +35,15 @@
     "oxlint-tsgolint": "^0.15.0"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "catalog:"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",
     "*.{ts,tsx,js,jsx}": "oxlint"
   },
-  "packageManager": "bun@1.3.9"
+  "packageManager": "bun@1.3.9",
+  "trustedDependencies": [
+    "spawn-sync",
+    "@app/extension-wxt"
+  ]
 }

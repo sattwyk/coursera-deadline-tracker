@@ -1,4 +1,4 @@
 {
   "files": [],
-  "references": [{ "path": "./worker/tsconfig.json" }, { "path": "./extension/tsconfig.json" }]
+  "references": [{ "path": "./worker/tsconfig.json" }, { "path": "./extension-wxt/tsconfig.json" }]
 }
