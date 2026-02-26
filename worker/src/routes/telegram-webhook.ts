@@ -27,7 +27,6 @@ import {
   telegramUpdateSchema,
   type TelegramCallbackQuery,
   type TelegramInlineQuery,
-  type TelegramMessage,
   type TelegramUpdate,
 } from "../schemas";
 import {

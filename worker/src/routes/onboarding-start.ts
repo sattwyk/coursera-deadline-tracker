@@ -2,11 +2,7 @@ import { Result } from "better-result";
 import { createOnboardingLink, expireOnboardingLinks } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
 import { parseJsonBodyWithSchema, parseWithSchema, runDbOperation } from "../result-utils";
-import {
-  onboardingStartBodySchema,
-  telegramGetMeSchema,
-  type OnboardingStartBody,
-} from "../schemas";
+import { onboardingStartBodySchema, telegramGetMeSchema } from "../schemas";
 import type { Env } from "../types";
 
 let cachedBotUsername: string | null = null;
