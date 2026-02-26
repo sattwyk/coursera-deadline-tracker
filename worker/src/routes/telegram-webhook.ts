@@ -22,7 +22,14 @@ import {
   escapeTelegramHtml,
   sendTelegramMessage,
 } from "../notify/telegram";
-import { parseJsonBody, runDbOperation } from "../result-utils";
+import { parseJsonBodyWithSchema, runDbOperation } from "../result-utils";
+import {
+  telegramUpdateSchema,
+  type TelegramCallbackQuery,
+  type TelegramInlineQuery,
+  type TelegramMessage,
+  type TelegramUpdate,
+} from "../schemas";
 import {
   type BotLocale,
   buildHelpText,
@@ -32,39 +39,6 @@ import {
 } from "../telegram/commands";
 import type { Env } from "../types";
 import { runFetchNowForUser } from "../usecases/fetch-now";
-
-type TelegramUser = {
-  id: number | string;
-  language_code?: string;
-};
-
-type TelegramMessage = {
-  message_id?: number;
-  text?: string;
-  chat?: { id: number | string };
-  from?: TelegramUser;
-};
-
-type TelegramCallbackQuery = {
-  id: string;
-  from: TelegramUser;
-  data?: string;
-  message?: TelegramMessage;
-};
-
-type TelegramInlineQuery = {
-  id: string;
-  from: TelegramUser;
-  query?: string;
-  offset?: string;
-};
-
-type TelegramUpdate = {
-  message?: TelegramMessage;
-  edited_message?: TelegramMessage;
-  callback_query?: TelegramCallbackQuery;
-  inline_query?: TelegramInlineQuery;
-};
 
 type CallbackAction =
   | { kind: "list"; filter: DeadlineFilter; page: number }
@@ -1115,7 +1089,11 @@ export async function handleTelegramWebhook(req: Request, env?: Env): Promise<Re
     return Response.json({ ok: true, warning: "missing DB or TELEGRAM_BOT_TOKEN binding" });
   }
 
-  const updateResult = await parseJsonBody<TelegramUpdate>(req, "/api/telegram/webhook");
+  const updateResult = await parseJsonBodyWithSchema(
+    req,
+    "/api/telegram/webhook",
+    telegramUpdateSchema,
+  );
   if (Result.isError(updateResult)) {
     return Response.json(
       { ok: false, error: updateResult.error.message, error_type: updateResult.error._tag },

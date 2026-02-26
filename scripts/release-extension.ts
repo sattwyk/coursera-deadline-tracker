@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 
-import { rm, mkdir, stat } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
 
 const ROOT = join(import.meta.dir, "..");
-const EXTENSION_DIST = join(ROOT, "extension/dist");
-const RELEASE_DIR = join(EXTENSION_DIST, "release");
+const EXTENSION_DIR = join(ROOT, "extension-wxt");
+const OUTPUT_DIR = join(EXTENSION_DIR, ".output");
+const RELEASE_DIR = join(OUTPUT_DIR, "release");
 
 const VERSION = process.env.VERSION || `v${new Date().toISOString().split("T")[0]}`;
 const REPO = process.env.REPO || "sattwyk/coursera-deadline-tracker";
@@ -18,33 +19,37 @@ if (!EXTENSION_BASE_URL) {
   process.exit(1);
 }
 
-console.log(`Building extension for release...`);
+console.log("Building and zipping WXT extension for release...");
 console.log(`  VERSION: ${VERSION}`);
 console.log(`  REPO: ${REPO}`);
 console.log(`  EXTENSION_BASE_URL: ${EXTENSION_BASE_URL}`);
 
-const build =
-  await $`cd ${join(ROOT, "extension")} && EXTENSION_BASE_URL=${EXTENSION_BASE_URL} bun run build:prod`;
-
-if (build.exitCode !== 0) {
-  console.error("Build failed!");
+const zipCmd =
+  await $`cd ${EXTENSION_DIR} && WXT_WORKER_BASE_URL=${EXTENSION_BASE_URL} WXT_DEV_KNOBS=false bun run zip`;
+if (zipCmd.exitCode !== 0) {
+  console.error("WXT zip failed!");
   process.exit(1);
 }
 
-console.log(`Creating release zip...`);
+const outputFiles = await readdir(OUTPUT_DIR);
+const chromeZip = outputFiles.find((file) => file.endsWith("-chrome.zip"));
+if (!chromeZip) {
+  console.error("Could not find generated Chrome zip in extension-wxt/.output");
+  process.exit(1);
+}
 
 await rm(RELEASE_DIR, { recursive: true, force: true });
 await mkdir(RELEASE_DIR, { recursive: true });
 
 const zipName = `coursera-deadline-tracker-${VERSION}.zip`;
+const sourceZipPath = join(OUTPUT_DIR, chromeZip);
 const zipPath = join(RELEASE_DIR, zipName);
-
-await $`cd ${EXTENSION_DIST} && zip -r ${zipPath} .`;
+await copyFile(sourceZipPath, zipPath);
 
 const zipStat = await stat(zipPath);
-console.log(`Zip created: ${zipName} (${(zipStat.size / 1024 / 1024).toFixed(2)} MB)`);
+console.log(`Zip ready: ${zipName} (${(zipStat.size / 1024 / 1024).toFixed(2)} MB)`);
 
-console.log(`\nCreating GitHub release...`);
+console.log("\nCreating GitHub release draft...");
 
 const releaseBody = `## Download
 
@@ -55,16 +60,10 @@ const releaseBody = `## Download
 5. Click "Load unpacked"
 6. Select the unzipped folder
 
-## Configure
+## Built With
 
-Update \`manifest.json\` with your worker URL if needed:
-\`\`\`json
-"host_permissions": [
-  "https://YOUR-WORKER-URL.workers.dev/*"
-]
-\`\`\`
-
-Or rebuild with: \`EXTENSION_BASE_URL=https://your-worker.workers.dev bun run build:prod\`
+- WXT + React + Tailwind + 8bit-style UI
+- Worker base URL set at build time via \`EXTENSION_BASE_URL\`
 `;
 
 const release =
@@ -76,4 +75,4 @@ if (release.exitCode !== 0) {
 }
 
 console.log(`\nRelease created: https://github.com/${REPO}/releases/tag/${VERSION}`);
-console.log(`   (It's a draft - edit and publish from the GitHub UI)`);
+console.log("   (It's a draft - edit and publish from the GitHub UI)");

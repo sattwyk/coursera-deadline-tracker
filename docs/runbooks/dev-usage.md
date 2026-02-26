@@ -101,18 +101,18 @@ TELEGRAM_BOT_TOKEN="$TOKEN" bun run telegram:sync-commands
 Terminal D:
 
 ```bash
-cd extension
-bun run build:watch
+cd extension-wxt
+bun run dev
 ```
 
-This keeps `extension/dist` updated.
+This keeps the dev build updated in `.output/chrome-mv3-dev`.
 
 ## 7) Load extension in Chrome
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
-4. Select: `.../coursera-scrapper/extension/dist`
+4. Select: `.../coursera-scrapper/extension-wxt/.output/chrome-mv3-dev`
 
 ## 8) Use the product flow
 

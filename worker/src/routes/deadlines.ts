@@ -1,7 +1,8 @@
 import { Result } from "better-result";
 import { requireAuth } from "../auth/require-auth";
 import { listCurrentDeadlines, type DeadlineFilter } from "../db/repositories";
-import { runDbOperation } from "../result-utils";
+import { parseWithSchema, runDbOperation } from "../result-utils";
+import { deadlinesQuerySchema } from "../schemas";
 import type { Env } from "../types";
 
 const DEADLINE_FILTERS: DeadlineFilter[] = ["pending", "completed", "upcoming", "overdue", "all"];
@@ -27,11 +28,21 @@ export async function handleDeadlines(req: Request, env?: Env): Promise<Response
   }
 
   const url = new URL(req.url);
-  const filter = normalizeFilter(url.searchParams.get("filter"));
-  const limitParam = Number(url.searchParams.get("limit") ?? 20);
-  const offsetParam = Number(url.searchParams.get("offset") ?? 0);
-  const limit = Number.isFinite(limitParam) ? Math.max(1, Math.min(100, limitParam)) : 20;
-  const offset = Number.isFinite(offsetParam) ? Math.max(0, offsetParam) : 0;
+  const queryResult = parseWithSchema(
+    Object.fromEntries(url.searchParams.entries()),
+    "/api/deadlines",
+    "query",
+    deadlinesQuerySchema,
+  );
+  if (Result.isError(queryResult)) {
+    return Response.json(
+      { error: queryResult.error.message, error_type: queryResult.error._tag },
+      { status: 400 },
+    );
+  }
+  const filter = normalizeFilter(queryResult.value.filter ?? null);
+  const limit = queryResult.value.limit;
+  const offset = queryResult.value.offset;
 
   const itemsResult = await runDbOperation("listCurrentDeadlines", () =>
     listCurrentDeadlines(env.DB!, {

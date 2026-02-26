@@ -23,7 +23,7 @@
 
 - Create: `src/`
 - Create: `tests/`
-- Create: `extension/`
+- Create: `extension-wxt/`
 - Create: `worker/`
 - Modify: `.gitignore`
 
@@ -32,10 +32,10 @@
 Run:
 
 ```bash
-mkdir src tests extension worker
+mkdir src tests extension-wxt worker
 ```
 
-Expected: Directories `src`, `tests`, `extension`, `worker` are created.
+Expected: Directories `src`, `tests`, `extension-wxt`, `worker` are created.
 
 **Step 2: Update .gitignore**
 
@@ -187,15 +187,15 @@ git commit -m "feat: create D1 database schema"
 
 **Files:**
 
-- Create: `extension/manifest.json`
-- Create: `extension/popup.html`
-- Create: `extension/popup.js`
-- Create: `extension/styles.css`
+- Create: `extension-wxt/manifest.json`
+- Create: `extension-wxt/popup.html`
+- Create: `extension-wxt/popup.js`
+- Create: `extension-wxt/styles.css`
 
 **Step 1: Create the manifest file**
 
 ```json
-// extension/manifest.json
+// extension-wxt/manifest.json
 {
   "manifest_version": 3,
   "name": "Coursera Deadline Tracker",
@@ -215,7 +215,7 @@ git commit -m "feat: create D1 database schema"
 **Step 2: Create the initial popup UI**
 
 ```html
-<!-- extension/popup.html -->
+<!-- extension-wxt/popup.html -->
 <!DOCTYPE html>
 <html>
   <head>
@@ -242,7 +242,7 @@ git commit -m "feat: create D1 database schema"
 **Step 3: Add basic UI logic**
 
 ```javascript
-// extension/popup.js
+// extension-wxt/popup.js
 document.addEventListener("DOMContentLoaded", () => {
   // ... basic event listeners for buttons ...
 });
@@ -252,13 +252,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 1. Go to `chrome://extensions`.
 2. Enable "Developer mode".
-3. Click "Load unpacked" and select the `extension` directory.
+3. Click "Load unpacked" and select the `extension-wxt` directory.
 4. Verify the popup appears.
 
 **Step 5: Commit**
 
 ```bash
-git add extension/
+git add extension-wxt/
 git commit -m "feat(extension): create basic manifest and popup UI"
 ```
 

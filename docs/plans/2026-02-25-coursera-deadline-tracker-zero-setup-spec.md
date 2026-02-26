@@ -30,10 +30,10 @@
 - Create: `worker/wrangler.toml`
 - Create: `worker/src/index.ts`
 - Create: `worker/test/smoke.test.ts`
-- Create: `extension/manifest.json`
-- Create: `extension/popup.html`
-- Create: `extension/popup.ts`
-- Create: `extension/background.ts`
+- Create: `extension-wxt/manifest.json`
+- Create: `extension-wxt/popup.html`
+- Create: `extension-wxt/popup.ts`
+- Create: `extension-wxt/background.ts`
 - Create: `README.md`
 
 **Step 1: Write failing smoke test for worker entrypoint export**
@@ -80,7 +80,7 @@ Use exact content:
 {
   "name": "coursera-deadline-tracker",
   "private": true,
-  "workspaces": ["worker", "extension"],
+  "workspaces": ["worker", "extension-wxt"],
   "scripts": {
     "test": "npm run -ws test"
   }
@@ -151,7 +151,7 @@ crons = ["*/30 * * * *"]
 ```
 
 ```json
-// extension/manifest.json
+// extension-wxt/manifest.json
 {
   "manifest_version": 3,
   "name": "Coursera Deadline Tracker",
@@ -166,7 +166,7 @@ crons = ["*/30 * * * *"]
 **Step 6: Commit**
 
 ```bash
-git add package.json .gitignore worker extension README.md
+git add package.json .gitignore worker extension-wxt README.md
 git commit -m "chore: bootstrap worker and extension skeleton"
 ```
 
@@ -985,16 +985,16 @@ git commit -m "feat(worker): add Telegram deadline change formatter"
 
 **Files:**
 
-- Modify: `extension/popup.html`
-- Modify: `extension/popup.ts`
-- Modify: `extension/background.ts`
-- Create: `extension/types.ts`
-- Test: `extension/popup.test.ts`
+- Modify: `extension-wxt/popup.html`
+- Modify: `extension-wxt/popup.ts`
+- Modify: `extension-wxt/background.ts`
+- Create: `extension-wxt/types.ts`
+- Test: `extension-wxt/popup.test.ts`
 
 **Step 1: Write failing popup state test**
 
 ```ts
-// extension/popup.test.ts
+// extension-wxt/popup.test.ts
 import { describe, it, expect } from "vitest";
 import { deriveStatusLabel } from "./popup";
 
@@ -1009,13 +1009,13 @@ describe("deriveStatusLabel", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npm run -w extension test -- extension/popup.test.ts`
+Run: `bun run test:extension-wxt`
 Expected: FAIL missing exports/test setup.
 
 **Step 3: Implement minimal derivation + onboarding actions**
 
 ```ts
-// extension/popup.ts
+// extension-wxt/popup.ts
 export function deriveStatusLabel(input: {
   hasToken: boolean;
   hasSession: boolean;
@@ -1028,7 +1028,7 @@ export function deriveStatusLabel(input: {
 ```
 
 ```ts
-// extension/background.ts (contract only)
+// extension-wxt/background.ts (contract only)
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "capture_session") {
     sendResponse({ ok: true, cookiesCaptured: 1 });
@@ -1038,13 +1038,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 **Step 4: Run test to verify it passes**
 
-Run: `npm run -w extension test -- extension/popup.test.ts`
+Run: `bun run test:extension-wxt`
 Expected: PASS.
 
 **Step 5: Commit**
 
 ```bash
-git add extension/popup.html extension/popup.ts extension/background.ts extension/types.ts extension/popup.test.ts
+git add extension-wxt/popup.html extension-wxt/popup.ts extension-wxt/background.ts extension-wxt/types.ts extension-wxt/popup.test.ts
 git commit -m "feat(extension): add zero-setup onboarding state contract"
 ```
 
@@ -1303,7 +1303,7 @@ Expected: PASS.
 Run extension tests:
 
 ```bash
-npm run -w extension test
+bun run test:extension-wxt
 ```
 
 Expected: PASS.

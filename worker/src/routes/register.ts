@@ -1,14 +1,12 @@
 import { Result } from "better-result";
 import { createOrGetUserAndToken } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
-import { parseJsonBody, runDbOperation } from "../result-utils";
+import { parseJsonBodyWithSchema, runDbOperation } from "../result-utils";
+import { registerBodySchema } from "../schemas";
 import type { Env } from "../types";
 
 export async function handleRegister(req: Request, env?: Env): Promise<Response> {
-  const bodyResult = await parseJsonBody<{
-    name: string;
-    telegram_chat_id: string;
-  }>(req, "/api/register");
+  const bodyResult = await parseJsonBodyWithSchema(req, "/api/register", registerBodySchema);
   if (Result.isError(bodyResult)) {
     return Response.json(
       { error: bodyResult.error.message, error_type: bodyResult.error._tag },
@@ -16,10 +14,6 @@ export async function handleRegister(req: Request, env?: Env): Promise<Response>
     );
   }
   const body = bodyResult.value;
-
-  if (!body?.name || !body?.telegram_chat_id) {
-    return Response.json({ error: "name and telegram_chat_id required" }, { status: 400 });
-  }
 
   if (!env) {
     return Response.json({

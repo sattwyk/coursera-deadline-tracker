@@ -1,12 +1,9 @@
 import { Result } from "better-result";
 import { cancelOnboardingByPollToken } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
-import { parseJsonBody, runDbOperation } from "../result-utils";
+import { parseJsonBodyWithSchema, runDbOperation } from "../result-utils";
+import { onboardingCancelBodySchema } from "../schemas";
 import type { Env } from "../types";
-
-type OnboardingCancelBody = {
-  poll_token?: string;
-};
 
 export async function handleOnboardingCancel(req: Request, env?: Env): Promise<Response> {
   if (!env?.DB) {
@@ -14,7 +11,11 @@ export async function handleOnboardingCancel(req: Request, env?: Env): Promise<R
     return Response.json({ error: missing.message, error_type: missing._tag }, { status: 500 });
   }
 
-  const bodyResult = await parseJsonBody<OnboardingCancelBody>(req, "/api/onboarding/cancel");
+  const bodyResult = await parseJsonBodyWithSchema(
+    req,
+    "/api/onboarding/cancel",
+    onboardingCancelBodySchema,
+  );
   if (Result.isError(bodyResult)) {
     return Response.json(
       { error: bodyResult.error.message, error_type: bodyResult.error._tag },
@@ -22,10 +23,7 @@ export async function handleOnboardingCancel(req: Request, env?: Env): Promise<R
     );
   }
 
-  const pollToken = bodyResult.value.poll_token?.trim() ?? "";
-  if (!pollToken) {
-    return Response.json({ error: "poll_token is required" }, { status: 400 });
-  }
+  const pollToken = bodyResult.value.poll_token;
 
   const cancelResult = await runDbOperation("cancelOnboardingByPollToken", () =>
     cancelOnboardingByPollToken(env.DB!, pollToken),

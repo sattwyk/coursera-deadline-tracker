@@ -3,7 +3,8 @@ import { requireAuth } from "../auth/require-auth";
 import { replaceUserDegreeTargets } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
 import { SessionEncodeError, SessionStoreWriteError } from "../errors";
-import { parseJsonBody, runDbOperation } from "../result-utils";
+import { parseJsonBodyWithSchema, runDbOperation } from "../result-utils";
+import { sessionBodySchema } from "../schemas";
 import { encodeSession } from "../security/session-crypto";
 import type { Env, SessionBundle } from "../types";
 
@@ -20,12 +21,7 @@ export async function handleSession(req: Request, env?: Env): Promise<Response> 
   const auth = await requireAuth(req, env);
   if (auth instanceof Response) return auth;
 
-  const bodyResult = await parseJsonBody<{
-    cookies?: unknown[];
-    csrf3Token?: string;
-    courseraUserId?: number;
-    degreeIds?: string[];
-  }>(req, "/api/session");
+  const bodyResult = await parseJsonBodyWithSchema(req, "/api/session", sessionBodySchema);
   if (Result.isError(bodyResult)) {
     return Response.json(
       { error: bodyResult.error.message, error_type: bodyResult.error._tag },
@@ -34,22 +30,8 @@ export async function handleSession(req: Request, env?: Env): Promise<Response> 
   }
   const body = bodyResult.value;
 
-  if (!Array.isArray(body.cookies) || body.cookies.length === 0) {
-    return Response.json({ error: "cookies required" }, { status: 400 });
-  }
-
-  if (typeof body.csrf3Token !== "string" || !body.csrf3Token) {
-    return Response.json({ error: "csrf3Token required" }, { status: 400 });
-  }
-  if (typeof body.courseraUserId !== "number") {
-    return Response.json({ error: "courseraUserId required" }, { status: 400 });
-  }
-  if (!Array.isArray(body.degreeIds) || body.degreeIds.length === 0) {
-    return Response.json({ error: "degreeIds required" }, { status: 400 });
-  }
-
   const session: SessionBundle = {
-    cookies: body.cookies as SessionBundle["cookies"],
+    cookies: body.cookies,
     csrf3Token: body.csrf3Token,
     courseraUserId: body.courseraUserId,
     degreeIds: body.degreeIds,

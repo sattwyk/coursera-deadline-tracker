@@ -31,6 +31,22 @@ export class InvalidJsonBodyError extends TaggedError("InvalidJsonBodyError")<{
   }
 }
 
+export class InvalidInputSchemaError extends TaggedError("InvalidInputSchemaError")<{
+  route: string;
+  source: "body" | "query" | "payload";
+  issues: string[];
+  message: string;
+}>() {
+  constructor(args: { route: string; source: "body" | "query" | "payload"; issues: string[] }) {
+    super({
+      route: args.route,
+      source: args.source,
+      issues: args.issues,
+      message: `Invalid ${args.source} for ${args.route}: ${args.issues.join("; ")}`,
+    });
+  }
+}
+
 export class DatabaseOperationError extends TaggedError("DatabaseOperationError")<{
   operation: string;
   message: string;
@@ -248,6 +264,7 @@ export class FetchLockActiveError extends TaggedError("FetchLockActiveError")<{
 export type FetchNowError =
   | MissingBindingsError
   | InvalidJsonBodyError
+  | InvalidInputSchemaError
   | SessionStoreReadError
   | SessionNotFoundError
   | InvalidSessionPayloadError

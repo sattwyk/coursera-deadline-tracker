@@ -1,7 +1,8 @@
 import { Result } from "better-result";
 import { expireOnboardingLinks, getOnboardingByPollToken } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
-import { runDbOperation } from "../result-utils";
+import { parseWithSchema, runDbOperation } from "../result-utils";
+import { onboardingStatusQuerySchema } from "../schemas";
 import type { Env } from "../types";
 
 export async function handleOnboardingStatus(req: Request, env?: Env): Promise<Response> {
@@ -11,10 +12,19 @@ export async function handleOnboardingStatus(req: Request, env?: Env): Promise<R
   }
 
   const url = new URL(req.url);
-  const pollToken = url.searchParams.get("poll_token")?.trim() ?? "";
-  if (!pollToken) {
-    return Response.json({ error: "poll_token is required" }, { status: 400 });
+  const queryResult = parseWithSchema(
+    Object.fromEntries(url.searchParams.entries()),
+    "/api/onboarding/status",
+    "query",
+    onboardingStatusQuerySchema,
+  );
+  if (Result.isError(queryResult)) {
+    return Response.json(
+      { error: queryResult.error.message, error_type: queryResult.error._tag },
+      { status: 400 },
+    );
   }
+  const pollToken = queryResult.value.poll_token;
 
   const expireResult = await runDbOperation("expireOnboardingLinks", () =>
     expireOnboardingLinks(env.DB!),

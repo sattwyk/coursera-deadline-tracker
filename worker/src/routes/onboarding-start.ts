@@ -1,12 +1,13 @@
 import { Result } from "better-result";
 import { createOnboardingLink, expireOnboardingLinks } from "../db/repositories";
 import { MissingBindingsError } from "../errors";
-import { parseJsonBody, runDbOperation } from "../result-utils";
+import { parseJsonBodyWithSchema, parseWithSchema, runDbOperation } from "../result-utils";
+import {
+  onboardingStartBodySchema,
+  telegramGetMeSchema,
+  type OnboardingStartBody,
+} from "../schemas";
 import type { Env } from "../types";
-
-type OnboardingStartBody = {
-  name?: string;
-};
 
 let cachedBotUsername: string | null = null;
 
@@ -32,13 +33,21 @@ async function resolveBotUsername(env: Env): Promise<Result<string, Error>> {
   }
 
   const jsonResult = await Result.tryPromise({
-    try: () => responseResult.value.json() as Promise<{ result?: { username?: string } }>,
+    try: () => responseResult.value.json() as Promise<unknown>,
     catch: (cause) =>
       new Error(cause instanceof Error ? cause.message : "Invalid Telegram getMe payload"),
   });
   if (Result.isError(jsonResult)) return jsonResult;
 
-  const username = normalizeBotUsername(jsonResult.value?.result?.username ?? "");
+  const parsed = parseWithSchema(
+    jsonResult.value,
+    "telegram:getMe",
+    "payload",
+    telegramGetMeSchema,
+  );
+  if (Result.isError(parsed)) return Result.err(new Error(parsed.error.message));
+
+  const username = normalizeBotUsername(parsed.value?.result?.username ?? "");
   if (!username) return Result.err(new Error("Telegram bot username missing in getMe response"));
   cachedBotUsername = username;
   return Result.ok(username);
@@ -50,7 +59,11 @@ export async function handleOnboardingStart(req: Request, env?: Env): Promise<Re
     return Response.json({ error: missing.message, error_type: missing._tag }, { status: 500 });
   }
 
-  const bodyResult = await parseJsonBody<OnboardingStartBody>(req, "/api/onboarding/start");
+  const bodyResult = await parseJsonBodyWithSchema(
+    req,
+    "/api/onboarding/start",
+    onboardingStartBodySchema,
+  );
   if (Result.isError(bodyResult)) {
     return Response.json(
       { error: bodyResult.error.message, error_type: bodyResult.error._tag },
@@ -69,7 +82,7 @@ export async function handleOnboardingStart(req: Request, env?: Env): Promise<Re
   }
 
   const createResult = await runDbOperation("createOnboardingLink", () =>
-    createOnboardingLink(env.DB!, { name: bodyResult.value.name }),
+    createOnboardingLink(env.DB!, { name: bodyResult.value.name || undefined }),
   );
   if (Result.isError(createResult)) {
     return Response.json(
