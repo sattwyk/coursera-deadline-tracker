@@ -27,5 +27,16 @@ export type PopupDerivedState = {
   autoDetectHint: string;
   tokenHint: string;
   statusText: string;
+  statusSummary: string;
+  hasStatus: boolean;
   canOpenTelegramLink: boolean;
+};
+
+export type PopupBusyState = {
+  onboarding: boolean;
+  sessionConnect: boolean;
+  fetchNow: boolean;
+  refreshStatus: boolean;
+  devRegister: boolean;
+  cancelOnboarding: boolean;
 };

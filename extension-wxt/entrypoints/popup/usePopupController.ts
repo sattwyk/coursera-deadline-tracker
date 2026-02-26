@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { Result } from "better-result";
 import {
   asNumber,
@@ -23,9 +23,17 @@ import {
 } from "@/lib/core/popup";
 import type { BannerKind, RegisterResponse } from "@/lib/core/types";
 import { initialPopupUiState, popupReducer } from "./controller-reducer";
-import type { PopupDerivedState, PopupUiState } from "./controller-types";
+import type { PopupBusyState, PopupDerivedState, PopupUiState } from "./controller-types";
 
 const IS_DEV_KNOBS = isDevKnobsEnabled();
+const INITIAL_BUSY_STATE: PopupBusyState = {
+  onboarding: false,
+  sessionConnect: false,
+  fetchNow: false,
+  refreshStatus: false,
+  devRegister: false,
+  cancelOnboarding: false,
+};
 
 type ControllerActions = {
   setField: (field: keyof PopupUiState["form"], value: string) => void;
@@ -96,9 +104,13 @@ function deriveState(state: PopupUiState): PopupDerivedState {
     ? `user_id=${state.storedState.userId || "?"} token=${tokenPreview}`
     : "Not registered";
 
+  const hasStatus = Boolean(state.storedState.lastStatus);
   const statusText = state.storedState.lastStatus
     ? `${state.storedState.lastStatusAt || ""}\n${JSON.stringify(state.storedState.lastStatus, null, 2)}`
     : "No status yet.";
+  const statusSummary = state.storedState.lastStatusAt
+    ? `Last updated: ${state.storedState.lastStatusAt}`
+    : "No sync status yet.";
 
   return {
     hasToken,
@@ -109,6 +121,8 @@ function deriveState(state: PopupUiState): PopupDerivedState {
     autoDetectHint,
     tokenHint,
     statusText,
+    statusSummary,
+    hasStatus,
     canOpenTelegramLink: Boolean(state.storedState.onboardingLinkUrl),
   };
 }
@@ -116,11 +130,25 @@ function deriveState(state: PopupUiState): PopupDerivedState {
 export function usePopupController(): {
   state: PopupUiState;
   derived: PopupDerivedState;
+  busy: PopupBusyState;
   isDevKnobs: boolean;
   actions: ControllerActions;
 } {
   const [state, dispatch] = useReducer(popupReducer, initialPopupUiState);
+  const [busy, setBusy] = useState<PopupBusyState>(INITIAL_BUSY_STATE);
   const pollInFlight = useRef(false);
+
+  const runWithBusy = useCallback(
+    async <T>(key: keyof PopupBusyState, operation: () => Promise<T>): Promise<T> => {
+      setBusy((current) => ({ ...current, [key]: true }));
+      try {
+        return await operation();
+      } finally {
+        setBusy((current) => ({ ...current, [key]: false }));
+      }
+    },
+    [],
+  );
 
   const setBanner = useCallback((text: string, kind: BannerKind): void => {
     dispatch({ type: "set-banner", payload: { text, kind } });
@@ -145,6 +173,77 @@ export function usePopupController(): {
 
   const connectCourseraSession = useCallback(
     async (fromAuto = false): Promise<void> => {
+      await runWithBusy("sessionConnect", async () => {
+        const liveState = await getState();
+        const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
+
+        if (!liveState.apiToken) {
+          setBanner("Connect Telegram first", "error");
+          return;
+        }
+
+        const overrides = getManualOverrides(state.form.devUserId, state.form.devDegreeIds);
+
+        setBanner(
+          fromAuto ? "Connecting Coursera session..." : "Capturing Coursera session...",
+          "neutral",
+        );
+
+        const out = await requestSessionAutoConnect({
+          baseUrl,
+          apiToken: liveState.apiToken,
+          courseraUserId: overrides.courseraUserId,
+          degreeIds: overrides.degreeIds,
+        });
+
+        if (Result.isError(out)) {
+          setBanner(`Session connect failed: ${out.error.message}`, "error");
+          return;
+        }
+
+        const value = out.value;
+        if (value && value.ok) {
+          await setState({
+            hasSession: true,
+            reauthRequired: false,
+            courseraUserId: asNumber(value.courseraUserId) ?? undefined,
+            degreeIds: asStringArray(value.degreeIds),
+            lastStatus: { connect: value },
+            lastStatusAt: new Date().toISOString(),
+          });
+          const cookiesCaptured = asString(value.cookiesCaptured) ?? "0";
+          setBanner(`Session uploaded (${cookiesCaptured} cookies)`, "ok");
+          await refreshUi();
+          return;
+        }
+
+        const retrying = Boolean(value?.retrying);
+        const message = asString(value?.error) ?? "session upload failed";
+        await setState({
+          hasSession: false,
+          lastStatus: { connect: value },
+          lastStatusAt: new Date().toISOString(),
+        });
+
+        setBanner(
+          retrying ? `Waiting for Coursera detection: ${message}` : `Connect failed: ${message}`,
+          retrying ? "neutral" : "error",
+        );
+        await refreshUi();
+      });
+    },
+    [
+      refreshUi,
+      runWithBusy,
+      setBanner,
+      state.form.devBaseUrl,
+      state.form.devDegreeIds,
+      state.form.devUserId,
+    ],
+  );
+
+  const onFetchNow = useCallback(async (): Promise<void> => {
+    await runWithBusy("fetchNow", async () => {
       const liveState = await getState();
       const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
 
@@ -153,164 +252,110 @@ export function usePopupController(): {
         return;
       }
 
-      const overrides = getManualOverrides(state.form.devUserId, state.form.devDegreeIds);
-
-      setBanner(
-        fromAuto ? "Connecting Coursera session..." : "Capturing Coursera session...",
-        "neutral",
-      );
-
-      const out = await requestSessionAutoConnect({
+      setBanner("Running fetch-now...", "neutral");
+      const out = await requestFetchNow({
         baseUrl,
-        apiToken: liveState.apiToken,
-        courseraUserId: overrides.courseraUserId,
-        degreeIds: overrides.degreeIds,
+        token: liveState.apiToken,
       });
 
       if (Result.isError(out)) {
-        setBanner(`Session connect failed: ${out.error.message}`, "error");
+        setBanner(`Fetch failed: ${out.error.message}`, "error");
         return;
       }
 
-      const value = out.value;
-      if (value && value.ok) {
-        await setState({
-          hasSession: true,
-          reauthRequired: false,
-          courseraUserId: asNumber(value.courseraUserId) ?? undefined,
-          degreeIds: asStringArray(value.degreeIds),
-          lastStatus: { connect: value },
-          lastStatusAt: new Date().toISOString(),
-        });
-        const cookiesCaptured = asString(value.cookiesCaptured) ?? "0";
-        setBanner(`Session uploaded (${cookiesCaptured} cookies)`, "ok");
-        await refreshUi();
-        return;
-      }
-
-      const retrying = Boolean(value?.retrying);
-      const message = asString(value?.error) ?? "session upload failed";
-      await setState({
-        hasSession: false,
-        lastStatus: { connect: value },
-        lastStatusAt: new Date().toISOString(),
-      });
-
-      setBanner(
-        retrying ? `Waiting for Coursera detection: ${message}` : `Connect failed: ${message}`,
-        retrying ? "neutral" : "error",
-      );
+      await setState({ lastStatus: { fetch: out.value }, lastStatusAt: new Date().toISOString() });
+      const itemsSeen = asString(out.value.items_seen) ?? "0";
+      const eventsCreated = asString(out.value.events_created) ?? "0";
+      setBanner(`Fetch complete (items=${itemsSeen}, events=${eventsCreated})`, "ok");
       await refreshUi();
-    },
-    [refreshUi, setBanner, state.form.devBaseUrl, state.form.devDegreeIds, state.form.devUserId],
-  );
-
-  const onFetchNow = useCallback(async (): Promise<void> => {
-    const liveState = await getState();
-    const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
-
-    if (!liveState.apiToken) {
-      setBanner("Connect Telegram first", "error");
-      return;
-    }
-
-    setBanner("Running fetch-now...", "neutral");
-    const out = await requestFetchNow({
-      baseUrl,
-      token: liveState.apiToken,
     });
-
-    if (Result.isError(out)) {
-      setBanner(`Fetch failed: ${out.error.message}`, "error");
-      return;
-    }
-
-    await setState({ lastStatus: { fetch: out.value }, lastStatusAt: new Date().toISOString() });
-    const itemsSeen = asString(out.value.items_seen) ?? "0";
-    const eventsCreated = asString(out.value.events_created) ?? "0";
-    setBanner(`Fetch complete (items=${itemsSeen}, events=${eventsCreated})`, "ok");
-    await refreshUi();
-  }, [refreshUi, setBanner, state.form.devBaseUrl]);
+  }, [refreshUi, runWithBusy, setBanner, state.form.devBaseUrl]);
 
   const onRefreshStatus = useCallback(async (): Promise<void> => {
-    const liveState = await getState();
-    const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
+    await runWithBusy("refreshStatus", async () => {
+      const liveState = await getState();
+      const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
 
-    if (!liveState.apiToken) {
-      setBanner("Connect Telegram first", "error");
-      return;
-    }
+      if (!liveState.apiToken) {
+        setBanner("Connect Telegram first", "error");
+        return;
+      }
 
-    setBanner("Loading status...", "neutral");
-    const out = await requestStatus({
-      baseUrl,
-      token: liveState.apiToken,
+      setBanner("Loading status...", "neutral");
+      const out = await requestStatus({
+        baseUrl,
+        token: liveState.apiToken,
+      });
+
+      if (Result.isError(out)) {
+        setBanner(`Status failed: ${out.error.message}`, "error");
+        return;
+      }
+
+      await setState({
+        lastStatus: { status: out.value },
+        lastStatusAt: new Date().toISOString(),
+        reauthRequired: Boolean(out.value.reauth_required),
+      });
+      setBanner("Status refreshed", "ok");
+      await refreshUi();
     });
-
-    if (Result.isError(out)) {
-      setBanner(`Status failed: ${out.error.message}`, "error");
-      return;
-    }
-
-    await setState({
-      lastStatus: { status: out.value },
-      lastStatusAt: new Date().toISOString(),
-      reauthRequired: Boolean(out.value.reauth_required),
-    });
-    setBanner("Status refreshed", "ok");
-    await refreshUi();
-  }, [refreshUi, setBanner, state.form.devBaseUrl]);
+  }, [refreshUi, runWithBusy, setBanner, state.form.devBaseUrl]);
 
   const startOnboarding = useCallback(async (): Promise<void> => {
-    const liveState = await getState();
-    const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
-    const chosenName = state.form.displayName.trim() || liveState.name || undefined;
+    await runWithBusy("onboarding", async () => {
+      const liveState = await getState();
+      const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
+      const chosenName = state.form.displayName.trim() || liveState.name || undefined;
 
-    setBanner("Creating secure Telegram link...", "neutral");
-    const out = await requestOnboardingStart({ baseUrl, name: chosenName });
-    if (Result.isError(out)) {
-      setBanner(`Onboarding failed: ${out.error.message}`, "error");
-      return;
-    }
+      setBanner("Creating secure Telegram link...", "neutral");
+      const out = await requestOnboardingStart({ baseUrl, name: chosenName });
+      if (Result.isError(out)) {
+        setBanner(`Onboarding failed: ${out.error.message}`, "error");
+        return;
+      }
 
-    await setState({
-      baseUrl,
-      name: chosenName,
-      onboardingLinkUrl: out.value.linkUrl,
-      onboardingPollToken: out.value.pollToken,
-      onboardingExpiresAt: out.value.expiresAt,
+      await setState({
+        baseUrl,
+        name: chosenName,
+        onboardingLinkUrl: out.value.linkUrl,
+        onboardingPollToken: out.value.pollToken,
+        onboardingExpiresAt: out.value.expiresAt,
+      });
+
+      await openTelegramLink(out.value.linkUrl);
+      setBanner("Telegram link opened. Send /start in the bot chat.", "ok");
+      await refreshUi();
     });
-
-    await openTelegramLink(out.value.linkUrl);
-    setBanner("Telegram link opened. Send /start in the bot chat.", "ok");
-    await refreshUi();
-  }, [refreshUi, setBanner, state.form.devBaseUrl, state.form.displayName]);
+  }, [refreshUi, runWithBusy, setBanner, state.form.devBaseUrl, state.form.displayName]);
 
   const onCancelOnboarding = useCallback(async (): Promise<void> => {
-    const liveState = await getState();
-    const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
-    const pollToken = liveState.onboardingPollToken?.trim();
+    await runWithBusy("cancelOnboarding", async () => {
+      const liveState = await getState();
+      const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
+      const pollToken = liveState.onboardingPollToken?.trim();
 
-    if (!pollToken) {
-      setBanner("No pending onboarding to cancel", "error");
-      return;
-    }
+      if (!pollToken) {
+        setBanner("No pending onboarding to cancel", "error");
+        return;
+      }
 
-    const out = await requestOnboardingCancel({ baseUrl, pollToken });
-    if (Result.isError(out)) {
-      setBanner(`Cancel failed: ${out.error.message}`, "error");
-      return;
-    }
+      const out = await requestOnboardingCancel({ baseUrl, pollToken });
+      if (Result.isError(out)) {
+        setBanner(`Cancel failed: ${out.error.message}`, "error");
+        return;
+      }
 
-    await setState({
-      onboardingPollToken: undefined,
-      onboardingLinkUrl: undefined,
-      onboardingExpiresAt: undefined,
+      await setState({
+        onboardingPollToken: undefined,
+        onboardingLinkUrl: undefined,
+        onboardingExpiresAt: undefined,
+      });
+
+      setBanner("Pending onboarding cancelled", "ok");
+      await refreshUi();
     });
-
-    setBanner("Pending onboarding cancelled", "ok");
-    await refreshUi();
-  }, [refreshUi, setBanner, state.form.devBaseUrl]);
+  }, [refreshUi, runWithBusy, setBanner, state.form.devBaseUrl]);
 
   const onPrimaryAction = useCallback(async (): Promise<void> => {
     const liveState = await getState();
@@ -344,35 +389,38 @@ export function usePopupController(): {
   }, [setBanner]);
 
   const onDevRegister = useCallback(async (): Promise<void> => {
-    const liveState = await getState();
-    const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
-    const name = state.form.displayName.trim() || liveState.name || "User";
-    const telegramChatId = state.form.devTelegramChatId.trim();
+    await runWithBusy("devRegister", async () => {
+      const liveState = await getState();
+      const baseUrl = getConfiguredBaseUrl(liveState, state.form.devBaseUrl);
+      const name = state.form.displayName.trim() || liveState.name || "User";
+      const telegramChatId = state.form.devTelegramChatId.trim();
 
-    if (!telegramChatId) {
-      setBanner("Dev register requires Telegram Chat ID", "error");
-      return;
-    }
+      if (!telegramChatId) {
+        setBanner("Dev register requires Telegram Chat ID", "error");
+        return;
+      }
 
-    const out = await requestDevRegister({ baseUrl, name, telegramChatId });
-    if (Result.isError(out)) {
-      setBanner(`Dev register failed: ${out.error.message}`, "error");
-      return;
-    }
+      const out = await requestDevRegister({ baseUrl, name, telegramChatId });
+      if (Result.isError(out)) {
+        setBanner(`Dev register failed: ${out.error.message}`, "error");
+        return;
+      }
 
-    const value = out.value as RegisterResponse;
-    await setState({
-      baseUrl,
-      name,
-      telegramChatId,
-      apiToken: value.api_token,
-      userId: value.user_id,
+      const value = out.value as RegisterResponse;
+      await setState({
+        baseUrl,
+        name,
+        telegramChatId,
+        apiToken: value.api_token,
+        userId: value.user_id,
+      });
+
+      setBanner("Dev register complete", "ok");
+      await refreshUi();
     });
-
-    setBanner("Dev register complete", "ok");
-    await refreshUi();
   }, [
     refreshUi,
+    runWithBusy,
     setBanner,
     state.form.devBaseUrl,
     state.form.devTelegramChatId,
@@ -477,6 +525,7 @@ export function usePopupController(): {
   return {
     state,
     derived: deriveState(state),
+    busy,
     isDevKnobs: IS_DEV_KNOBS,
     actions: {
       setField,

@@ -91,7 +91,7 @@ export function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => asString(item) ?? "").filter(Boolean) : [];
 }
 
-export function parseDegreeIds(raw: string): string[] {
+function parseDegreeIds(raw: string): string[] {
   return raw
     .split(",")
     .map((x) => x.trim())
@@ -136,7 +136,7 @@ export function getManualOverrides(
   };
 }
 
-export async function callApi<T extends Record<string, unknown> = Record<string, unknown>>(
+async function callApi<T extends Record<string, unknown> = Record<string, unknown>>(
   input: ApiRequest,
   schema?: z.ZodMiniType<T>,
 ): Promise<Result<T, PopupApiError>> {
@@ -197,7 +197,7 @@ export async function callApi<T extends Record<string, unknown> = Record<string,
   return Result.ok(parsed.data);
 }
 
-export function sendMessage<T = unknown>(
+function sendMessage<T = unknown>(
   msg: Record<string, unknown>,
 ): Promise<Result<T, PopupMessageError>> {
   return new Promise((resolve) => {

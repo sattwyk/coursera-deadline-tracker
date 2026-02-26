@@ -55,7 +55,7 @@ export const onboardingPollValueSchema = z.looseObject({
   name: z.optional(z.string()),
 });
 
-export const sessionAutoConnectSuccessSchema = z.looseObject({
+const sessionAutoConnectSuccessSchema = z.looseObject({
   ok: z.literal(true),
   cookiesCaptured: z.number().check(z.nonnegative()),
   encodedSize: z.unknown(),
@@ -63,7 +63,7 @@ export const sessionAutoConnectSuccessSchema = z.looseObject({
   degreeIds: z.array(z.string()),
 });
 
-export const sessionAutoConnectFailureSchema = z.looseObject({
+const sessionAutoConnectFailureSchema = z.looseObject({
   ok: z.literal(false),
   error: z.string().check(z.minLength(1)),
   retrying: z.optional(z.boolean()),
@@ -97,7 +97,10 @@ export const onboardingPollPayloadSchema = z.object({
   pollToken: z.string().check(z.trim(), z.minLength(1)),
 });
 
-export const onboardingCancelPayloadSchema = onboardingPollPayloadSchema;
+export const onboardingCancelPayloadSchema = z.object({
+  baseUrl: z.string().check(z.trim(), z.minLength(1)),
+  pollToken: z.string().check(z.trim(), z.minLength(1)),
+});
 
 export const detectionPayloadSchema = z.object({
   userId: z.coerce.number().check(z.int(), z.positive()),
