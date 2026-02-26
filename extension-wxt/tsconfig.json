@@ -3,9 +3,10 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "types": ["chrome"],
     "paths": {
       "@/*": ["./*"]
     }
-  }
+  },
+  "exclude": ["./.output", "./**/*.test.ts"]
 }
