@@ -1,124 +1,93 @@
-<img src="logo.png" alt="Coursera Deadline Tracker" width="120">
-
 # Coursera Deadline Tracker
 
-Get Telegram alerts when your Coursera assignment deadlines change. Tracks your degree page and notifies you of new, modified, or approaching deadlines.
+Track Coursera deadlines from a browser extension and get updates in Telegram without constantly checking Coursera manually.
 
-## What This Does
+## What You Get
 
-- 🔔 **Alerts you on Telegram** when deadlines are added, changed, or due soon
-- 👀 **Watches your Coursera degree page** automatically
-- ⏰ **Respects your timezone** - see deadlines in your local time
-- 🔍 **Search anywhere** - type `@yourbot upcoming` in any chat to see deadlines
+- A browser extension that links your Coursera session
+- A Telegram bot for deadline updates and quick commands
+- One-click setup from the extension popup
 
-## Prerequisites
+## Install (From GitHub Releases)
 
-- A **Telegram account** (to receive alerts)
-- A **Chrome browser** (to run the extension)
-- A **Coursera Plus** or degree program with deadlines
+1. Open this repo’s **Releases** page.
+2. Download the latest `coursera-deadline-tracker-<version>.zip`.
+3. Unzip it to a folder you’ll keep (don’t delete it later).
+4. Open `chrome://extensions`.
+5. Turn on **Developer mode** (top-right).
+6. Click **Load unpacked** and select the unzipped folder.
 
-## Set Up
+That’s it. No local build needed for normal users.
 
-### Step 1: Deploy the Worker
+## First-Time Setup
 
-If you have Cloudflare Wrangler installed:
+1. Log into Coursera in the same browser profile where the extension is installed.
+2. Click the extension icon to open the popup.
+3. Click **Connect Telegram**.
+4. Telegram opens; press **Start** (or send `/start`) in the bot chat.
+5. Go back to the extension popup.
+6. Click **Open Coursera** once and open your degree dashboard page.
+7. Come back and click **Fetch Now**.
+8. Click **Refresh Status** to confirm everything is connected.
 
-```bash
-cd worker
-wrangler deploy
-```
+## Daily Use
 
-Or deploy from the [Cloudflare Dashboard](https://dash.cloudflare.com/).
+- Use **Fetch Now** in the popup whenever you want an immediate sync.
+- Use Telegram commands and buttons for fast filtering.
 
-### Step 2: Get a Telegram Bot
+### Useful Telegram Commands
 
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot` and follow the instructions
-3. Copy your **bot token** (looks like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
+- `/status` current sync + settings summary
+- `/list upcoming` upcoming deadlines
+- `/list pending` pending items
+- `/list completed` completed items
+- `/list overdue` overdue items
+- `/list all` everything
+- `/sync` run immediate sync
+- `/help` full command help
 
-### Step 3: Configure the Worker
+### Quick Filter Buttons
 
-```bash
-wrangler secret put TELEGRAM_BOT_TOKEN
-# Paste your bot token when prompted
-```
+Inside Telegram responses, use inline buttons:
 
-### Step 4: Set the Webhook
+- `Upcoming`
+- `Pending`
+- `Completed`
+- `Overdue`
+- `All`
 
-```bash
-# Replace with your values
-TOKEN="<your-bot-token>"
-WORKER_URL="https://your-worker.workers.dev"
+You’ll also see `Prev` / `Next` buttons when there are multiple pages.
 
-curl -sS "https://api.telegram.org/bot$TOKEN/setWebhook" \
-  -H "content-type: application/json" \
-  -d "{\"url\":\"$WORKER_URL/api/telegram/webhook\"}"
-```
+## Troubleshooting (User-Focused)
 
-### Step 5: Load the Extension
+### Telegram connected but no deadlines appear
 
-1. Download the release from GitHub Releases
-2. Unzip the file
-3. Open Chrome → `chrome://extensions/`
-4. Enable **Developer mode** (top right)
-5. Click **Load unpacked**
-6. Select the unzipped folder
+- Make sure you opened your Coursera degree page at least once after installing.
+- Click **Fetch Now** again.
+- Confirm you are logged into Coursera in the same browser profile.
 
-### Step 6: Connect Everything
+### Bot says auth expired (401/403)
 
-1. Open the extension in Chrome
-2. Click **"Connect Telegram"**
-3. Telegram opens with a deep link - tap **START**
-4. Return to the extension - it auto-connects
-5. Open your Coursera degree page once to auto-detect your IDs
+- Reconnect using the extension popup (Connect Telegram / re-link flow).
+- Then run `/sync` again.
 
-You're all set! You'll get alerts when deadlines change.
+### Telegram buttons don’t respond
 
-## Commands
+- Send `/status` once, then try buttons again.
+- If it still fails, the backend webhook may be unhealthy. Report it to the maintainer/admin of your deployment.
 
-In your Telegram chat with the bot:
+### Reinstalling or updating extension
 
-| Command            | What It Does                        |
-| ------------------ | ----------------------------------- |
-| `/start`           | Link your Telegram to the extension |
-| `/status`          | See last sync time and settings     |
-| `/list upcoming`   | Show upcoming deadlines             |
-| `/list pending`    | Show pending assignments            |
-| `/list overdue`    | Show overdue items                  |
-| `/settings`        | Change notification preferences     |
-| `/pause`           | Stop notifications temporarily      |
-| `/resume`          | Re-enable notifications             |
-| `/tz Asia/Kolkata` | Set your timezone                   |
-| `/help`            | Show all commands                   |
+- Download the latest release zip.
+- Unzip it.
+- In `chrome://extensions`, click **Reload** on the extension card (or remove + Load unpacked again).
 
-### Inline Search
+## For Self-Hosting / Contributors
 
-After enabling inline mode with BotFather, you can search deadlines from any chat:
+If you are running your own worker/tunnel/dev stack, use:
 
-```
-@coursera_deadline_tracker_bot upcoming
-```
+- [Dev Usage Runbook](/home/satty/projects/coursera-scrapper/docs/runbooks/dev-usage.md)
+- [Local Smoke Runbook](/home/satty/projects/coursera-scrapper/docs/runbooks/local-smoke.md)
+- [Extension WXT Runbook](/home/satty/projects/coursera-scrapper/docs/runbooks/extension-wxt.md)
 
-## Troubleshooting
-
-**No deadlines showing?**
-
-- Open your Coursera degree page and refresh
-- Run `/sync` to trigger a manual fetch
-
-**Not receiving messages?**
-
-- Check `/status` to see last sync time
-- Make sure you're not in `/pause` mode
-
-**Need to change the worker URL?**
-
-- Re-run the release script with your new URL:
-  ```
-  EXTENSION_BASE_URL=https://new-url.workers.dev bun run release
-  ```
-
-## Support
-
-- Open an issue on [GitHub](https://github.com/sattwyk/coursera-deadline-tracker)
-- For bugs or feature requests, include your worker URL and what you tried
+Implementation workspace: `extension-wxt/`
